@@ -2,6 +2,9 @@
 
 import numpy as np
 import pandas as pd
+from matplotlib.cbook import boxplot_stats
+import matplotlib.pyplot as plt
+import seaborn as sn
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
@@ -33,12 +36,10 @@ print(data.duplicated().sum())
 
 # %% Removing Unnecessary Columns: [By Logical]
 
-data.drop(['url', 'address', 'reviews_list', 'menu_item', 'phone', 'dish_liked', 'rest_type', 'cuisines'], axis=1,
-          inplace=True)
+data.drop(['url', 'reviews_list', 'menu_item', 'phone', 'dish_liked'], axis=1, inplace=True)
 print(data.info())
 
 # %% Making miscellaneous data normal:
-
 # Making NEW values in rate column as Nan values:
 
 print('The NEW values: ')
@@ -78,34 +79,38 @@ print(impute_data)
 # In this, we have 2 columns of categorical and 1 continuously:
 
 impute_data = impute_data
-Impute = SimpleImputer()
-data['approx_cost(for two people)'] = Impute.fit_transform(
-    data['approx_cost(for two people)'].to_numpy().reshape((-1, 1)))
+Impute = SimpleImputer(strategy='median')
+data['approx_cost(for two people)'] = Impute.fit_transform(data['approx_cost(for two people)'].to_numpy().reshape((-1, 1)))
 print(data.isna().sum())
 
-# Dropping missing values for categorical as they of less number:
+# %% Replacing the Nan values of cuisines and rest_type:
 
+mode = lambda x: x.mode().iloc[0] if not x.mode().empty else None
+data['rest_type'].fillna(data.groupby('approx_cost(for two people)')['rest_type'].transform(mode), inplace=True)
+data['cuisines'].fillna(data.groupby('rest_type')['cuisines'].transform(mode), inplace=True)
 print(data.isna().sum())
-print(data.shape)
-data.dropna(subset=['location'], inplace=True)
-print(data.isna().sum())
 
-# %%
-# region Anomaly Detection and Outliers Detection NEED TO LEARN!!
+# %% Getting the number of available cuisines and restaurant type:
 
-stats = data.describe()
-q1 = stats.loc['25%', :]
-q3 = stats.loc['75%', :]
-iqr = q3 - q1
-outlier_rate = data[(data['rate'] < q1['rate'] - (1.5 * iqr['rate'])) | (data['rate'] > q3['rate'] + (1.5 * iqr['rate']))]
-print(outlier_rate.shape)
-data.drop(outlier_rate.index, inplace=True)
-data.reset_index(drop=True)
-print(data.shape)
+data['cuisines'] = data['cuisines'].str.split(',')
+data['rest_type'] = data['rest_type'].str.split(',')
+data['cuisines'] = data['cuisines'].apply(lambda x: len(x)-1)
+data['rest_type'] = data['rest_type'].apply(lambda y: len(y)-1)
+
+# %% Anomaly Detection and Outliers:
+
+sn.boxplot(data=data, color="lightgreen")
+plt.show()
+
+# %% Removing the detected outliers:
+
+outliers = (boxplot_stats(data[data.columns[[4, 5, 9]]]))
+outliers = pd.DataFrame(outliers)['fliers']
+data = data[~data['rate'].isin(outliers[0])]
 
 # %% Splitting Data between Independent and Dependent:
 
-X = data[['online_order', 'book_table', 'votes', 'rate', 'listed_in(type)', 'listed_in(city)', 'location']]
+X = data[['online_order', 'book_table', 'votes', 'rate', 'listed_in(type)', 'listed_in(city)', 'location', 'cuisines', 'rest_type']]
 Y = data['approx_cost(for two people)'].values
 
 # %% Standardization of continuous data:
@@ -129,42 +134,35 @@ X_trans = (ct.fit_transform(X).toarray())
 
 X_train, X_test, Y_train, Y_test = train_test_split(X_trans, Y, test_size=0.2)
 
-# %% Using Linear Model to fit the data:
+# %% Using Linear Regression:
 
 lr = LinearRegression()
 lr.fit(X_train, Y_train)
-
-# %% Predict the values:
-
 Y_predict = lr.predict(X_test)
-
-# %% Calculating the Accuracy of the analysis:
-
 lr = r2_score(Y_test, Y_predict)
 
-# %%
-# Preparing Extra Tree Regression
+# %% Preparing Extra Tree Regression:
 
 RF_Model = RandomForestRegressor(n_estimators=650, random_state=245, min_samples_leaf=.0001, verbose=2, n_jobs=-1)
 RF_Model.fit(X_train, Y_train.ravel())
 Y_predict = RF_Model.predict(X_test)
 rf = r2_score(Y_test, Y_predict)
 
-# %%
+# %% Using Extra Trees Regressor:
 
 ET_Model = ExtraTreesRegressor(n_estimators=120, verbose=2, n_jobs=-1)
 ET_Model.fit(X_train, Y_train)
 Y_predict = ET_Model.predict(X_test)
 et = r2_score(Y_test, Y_predict)
 
-# %%
+# %% Using XGB Regressor:
 
 xgb_r = xg.XGBRegressor(n_estimators=1000, verbosity=3, n_jobs=-1)
 xgb_r.fit(X_train, Y_train)
 Y_predict = xgb_r.predict(X_test)
 xbr = r2_score(Y_test, Y_predict)
 
-# %%
+# %% Printing the Accuracy of Models:
 
 print("The R2 score of Linear Regression: ", lr)
 print("The R2 score of Random Forest: ", rf)
