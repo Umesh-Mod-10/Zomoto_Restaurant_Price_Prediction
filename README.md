@@ -1,0 +1,3 @@
+# Zomoto Banglore Restaurant Price Prediction
+
+Zomoto is one of the online food ordering applications, dominating marketplaces in India's most populous country. Zomato provides restaurant information, menus, and user ratings, as well as food delivery choices from partner restaurants. According to sources, Zomoto is active in over 1,000 Indian cities and towns as of 2022–23. By utilizing the dataset of Banglore, one of the fastest developing cities and one of the most ordered cities online. The dataset of Banglore city hotels listed on Zomoto includes dining information that determines the factor of Average Pricing for 2 people.
